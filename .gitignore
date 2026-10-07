@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Datasets
+data/*
+!data/.gitkeep
+
+# Trained models
+models/*
+!models/.gitkeep
+
+# Environment / secrets
+.env
+.env.*
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
