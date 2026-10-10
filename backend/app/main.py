@@ -133,3 +133,35 @@ def get_prediction_history(limit: int = 50):
         "count": len(rows),
         "predictions": [dict(row) for row in rows],
     }
+@app.get("/stats")
+def get_prediction_stats():
+    with get_connection() as connection:
+        total = connection.execute(
+            "SELECT COUNT(*) FROM prediction_history"
+        ).fetchone()[0]
+
+        categories = connection.execute(
+            """
+            SELECT predicted_category, COUNT(*) AS count
+            FROM prediction_history
+            GROUP BY predicted_category
+            ORDER BY count DESC
+            """
+        ).fetchall()
+
+        average_confidence = connection.execute(
+            "SELECT AVG(confidence) FROM prediction_history"
+        ).fetchone()[0]
+
+    return {
+        "total_predictions": total,
+        "category_counts": {
+            row["predicted_category"]: row["count"]
+            for row in categories
+        },
+        "average_confidence": (
+            round(average_confidence, 4)
+            if average_confidence is not None
+            else None
+        ),
+    }
