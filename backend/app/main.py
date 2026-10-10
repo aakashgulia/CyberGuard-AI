@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from backend.app.schemas import PredictionResponse
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,7 +54,7 @@ def health():
     }
 
 
-@app.post("/predict")
+@app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
     if model_service.model is None:
         raise HTTPException(status_code=503, detail="Model is not loaded.")
