@@ -18,3 +18,13 @@ def test_health():
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
     assert response.json()["model_loaded"] is True
+
+
+def test_predict_rejects_missing_features():
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={"features": {"Destination Port": 443}},
+        )
+
+    assert response.status_code == 422
