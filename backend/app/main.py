@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from backend.app.schemas import PredictionResponse
+from backend.app.database import initialize_database
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,7 @@ from backend.app.model_service import model_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    initialize_database()
     model_service.load()
     yield
 
