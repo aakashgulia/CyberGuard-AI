@@ -1,0 +1,15 @@
+CyberGuard AI ? Random Forest Baseline
+==========================================
+Test records: 31,170
+Features: 78
+Accuracy: 99.7626%
+Macro F1: 98.9777%
+Weighted F1: 99.7640%
+
+Per-class metrics:
+Botnet: Precision=93.2367%, Recall=98.9744%, F1=96.0199%, Support=390
+Brute Force: Precision=99.7577%, Recall=100.0000%, F1=99.8787%, Support=1647
+DoS/DDoS: Precision=99.8192%, Recall=99.8192%, F1=99.8192%, Support=6636
+Normal: Precision=99.9149%, Recall=99.7650%, F1=99.8399%, Support=20000
+Port Scan: Precision=99.6139%, Recall=99.8066%, F1=99.7101%, Support=2068
+Web Attack: Precision=98.8290%, Recall=98.3683%, F1=98.5981%, Support=429
