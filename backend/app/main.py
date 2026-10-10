@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from backend.app.schemas import PredictionResponse
-from backend.app.database import initialize_database
+from backend.app.database import get_connection, initialize_database, save_prediction
 from backend.app.database import initialize_database, save_prediction
 
 from fastapi import FastAPI, HTTPException
@@ -107,3 +107,29 @@ def predict(request: PredictionRequest):
             status_code=422,
             detail=f"Invalid feature values: {exc}",
         ) from exc
+    from backend.app.database import get_connection
+
+
+@app.get("/history")
+def get_prediction_history(limit: int = 50):
+    if not 1 <= limit <= 500:
+        raise HTTPException(
+            status_code=422,
+            detail="Limit must be between 1 and 500.",
+        )
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, timestamp, predicted_category, confidence
+            FROM prediction_history
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return {
+        "count": len(rows),
+        "predictions": [dict(row) for row in rows],
+    }

@@ -31,6 +31,7 @@ def initialize_database():
 
 def save_prediction(predicted_category, confidence, features):
     timestamp = datetime.now(timezone.utc).isoformat()
+    features_json = json.dumps(features)
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -43,11 +44,6 @@ def save_prediction(predicted_category, confidence, features):
             )
             VALUES (?, ?, ?, ?)
             """,
-            (
-                predicted_category,
-                confidence,
-                json.dumps(features),
-                json.dumps(features),
-            ),
+            (timestamp, predicted_category, confidence, features_json),
         )
         return cursor.lastrowid
