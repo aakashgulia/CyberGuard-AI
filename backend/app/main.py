@@ -165,3 +165,18 @@ def get_prediction_stats():
             else None
         ),
     }
+
+@app.get("/model-info")
+def get_model_info():
+    if model_service.model is None or model_service.encoder is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model is not loaded.",
+        )
+
+    return {
+        "model_type": type(model_service.model).__name__,
+        "model_loaded": True,
+        "feature_count": len(model_service.model.feature_names_in_),
+        "categories": model_service.encoder.classes_.tolist(),
+    }
