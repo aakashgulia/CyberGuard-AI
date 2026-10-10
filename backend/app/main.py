@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from backend.app.schemas import PredictionResponse
 from backend.app.database import initialize_database
+from backend.app.database import initialize_database, save_prediction
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -87,6 +88,11 @@ def predict(request: PredictionRequest):
         )
 
         result = model_service.predict(feature_frame)
+        save_prediction(
+        predicted_category=result["predicted_category"],
+        confidence=result["confidence"],
+        features=request.features,
+)
         return {
             **result,
             "confidence_percent": round(result["confidence"] * 100, 2),
