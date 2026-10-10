@@ -180,3 +180,22 @@ def get_model_info():
         "feature_count": len(model_service.model.feature_names_in_),
         "categories": model_service.encoder.classes_.tolist(),
     }
+@app.get("/api-info")
+def get_api_info():
+    return {
+        "application": "CyberGuard AI",
+        "version": "1.0.0",
+        "capabilities": [
+            "Network traffic classification",
+            "Prediction history",
+            "Prediction statistics",
+            "Model information",
+        ],
+        "endpoints": {
+            "health": "/health",
+            "predict": "/predict",
+            "history": "/history",
+            "statistics": "/stats",
+            "model_info": "/model-info",
+        },
+    }
