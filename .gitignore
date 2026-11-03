@@ -25,3 +25,6 @@ dist/
 
 # Logs
 *.log
+
+# Include trained CyberGuard AI models
+!models/*.joblib

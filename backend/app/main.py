@@ -1,13 +1,19 @@
+
+import math
 from contextlib import asynccontextmanager
-from backend.app.schemas import PredictionResponse
-from backend.app.database import get_connection, initialize_database, save_prediction
-from backend.app.database import initialize_database, save_prediction
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from backend.app.database import (
+    get_connection,
+    initialize_database,
+    save_prediction,
+)
 from backend.app.model_service import model_service
+from backend.app.risk_engine import calculate_risk
+from backend.app.schemas import PredictionResponse
 
 
 @asynccontextmanager
@@ -26,7 +32,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -36,7 +47,9 @@ app.add_middleware(
 class PredictionRequest(BaseModel):
     features: dict[str, float] = Field(
         ...,
-        description="Network-flow features using the trained model's feature names.",
+        description=(
+            "Network-flow features using the trained model's feature names."
+        ),
     )
 
 
@@ -60,7 +73,10 @@ def health():
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
     if model_service.model is None:
-        raise HTTPException(status_code=503, detail="Model is not loaded.")
+        raise HTTPException(
+            status_code=503,
+            detail="Model is not loaded.",
+        )
 
     expected_features = list(model_service.model.feature_names_in_)
     received_features = set(request.features)
@@ -79,6 +95,24 @@ def predict(request: PredictionRequest):
             },
         )
 
+    invalid_features = sorted(
+        name
+        for name, value in request.features.items()
+        if not math.isfinite(value)
+    )
+
+    if invalid_features:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "Feature values must be finite numbers; "
+                    "NaN and infinity are not accepted."
+                ),
+                "invalid_features": invalid_features,
+            },
+        )
+
     try:
         import pandas as pd
 
@@ -88,26 +122,44 @@ def predict(request: PredictionRequest):
         )
 
         result = model_service.predict(feature_frame)
-        save_prediction(
-        predicted_category=result["predicted_category"],
-        confidence=result["confidence"],
-        features=request.features,
-)
-        return {
+        risk = calculate_risk(
+            result["predicted_category"],
+            result["confidence"],
+        )
+
+        response = {
             **result,
-            "confidence_percent": round(result["confidence"] * 100, 2),
+            **risk,
+            "confidence_percent": round(
+                result["confidence"] * 100,
+                2,
+            ),
             "disclaimer": (
                 "This is a model prediction, not a guarantee that "
                 "network activity is malicious or safe."
             ),
         }
 
+        # Validate the response before saving the prediction.
+        validated_response = PredictionResponse(**response)
+
+        save_prediction(
+            predicted_category=result["predicted_category"],
+            confidence=result["confidence"],
+            features=request.features,
+            risk_score=risk["risk_score"],
+            risk_level=risk["risk_level"],
+        )
+
+        return validated_response
+
+    except HTTPException:
+        raise
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=422,
             detail=f"Invalid feature values: {exc}",
         ) from exc
-    from backend.app.database import get_connection
 
 
 @app.get("/history")
@@ -121,7 +173,13 @@ def get_prediction_history(limit: int = 50):
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT id, timestamp, predicted_category, confidence
+            SELECT
+                id,
+                timestamp,
+                predicted_category,
+                confidence,
+                risk_score,
+                risk_level
             FROM prediction_history
             ORDER BY id DESC
             LIMIT ?
@@ -133,6 +191,8 @@ def get_prediction_history(limit: int = 50):
         "count": len(rows),
         "predictions": [dict(row) for row in rows],
     }
+
+
 @app.get("/stats")
 def get_prediction_stats():
     with get_connection() as connection:
@@ -153,6 +213,14 @@ def get_prediction_stats():
             "SELECT AVG(confidence) FROM prediction_history"
         ).fetchone()[0]
 
+        high_risk_events = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM prediction_history
+            WHERE risk_level IN ('High', 'Critical')
+            """
+        ).fetchone()[0]
+
     return {
         "total_predictions": total,
         "category_counts": {
@@ -164,7 +232,9 @@ def get_prediction_stats():
             if average_confidence is not None
             else None
         ),
+        "high_risk_events": high_risk_events,
     }
+
 
 @app.get("/model-info")
 def get_model_info():
@@ -178,8 +248,11 @@ def get_model_info():
         "model_type": type(model_service.model).__name__,
         "model_loaded": True,
         "feature_count": len(model_service.model.feature_names_in_),
+        "feature_names": model_service.model.feature_names_in_.tolist(),
         "categories": model_service.encoder.classes_.tolist(),
     }
+
+
 @app.get("/api-info")
 def get_api_info():
     return {

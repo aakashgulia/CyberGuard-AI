@@ -1,3 +1,4 @@
+
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -28,8 +29,31 @@ def initialize_database():
             """
         )
 
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(prediction_history)"
+            ).fetchall()
+        }
 
-def save_prediction(predicted_category, confidence, features):
+        if "risk_score" not in columns:
+            connection.execute(
+                "ALTER TABLE prediction_history ADD COLUMN risk_score INTEGER"
+            )
+
+        if "risk_level" not in columns:
+            connection.execute(
+                "ALTER TABLE prediction_history ADD COLUMN risk_level TEXT"
+            )
+
+
+def save_prediction(
+    predicted_category,
+    confidence,
+    features,
+    risk_score=None,
+    risk_level=None,
+):
     timestamp = datetime.now(timezone.utc).isoformat()
     features_json = json.dumps(features)
 
@@ -40,10 +64,19 @@ def save_prediction(predicted_category, confidence, features):
                 timestamp,
                 predicted_category,
                 confidence,
-                features_json
+                features_json,
+                risk_score,
+                risk_level
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (timestamp, predicted_category, confidence, features_json),
+            (
+                timestamp,
+                predicted_category,
+                confidence,
+                features_json,
+                risk_score,
+                risk_level,
+            ),
         )
         return cursor.lastrowid
